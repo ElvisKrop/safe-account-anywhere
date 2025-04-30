@@ -35,10 +35,15 @@ export function ChainStep({ onNext }: ChainStepProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isSafeValid, setIsSafeValid] = useState<boolean | null>(null)
   const [txInfo, setTxInfo] = useState<any>(null)
-  const [isNextEnabled, setIsNextEnabled] = useState(false)
+  const [validationComplete, setValidationComplete] = useState(false)
 
   const addLog = useCallback((message: string, type: "info" | "success" | "error" = "info") => {
     setLogs((prevLogs) => [...prevLogs, { message, type, timestamp: new Date() }])
+
+    // If we see the success message for deployment data parsing, enable the Next button
+    if (message === "Deployment transaction data parsed and validated successfully" && type === "success") {
+      setValidationComplete(true)
+    }
   }, [])
 
   const handleFetchChainInfo = useCallback(
@@ -76,7 +81,7 @@ export function ChainStep({ onNext }: ChainStepProps) {
         setIsLoading(false)
       }
     },
-    [addLog],
+    [chains.sourceChain?.rpcUrls, addLog],
   )
 
   const fetchTransactionInfo = useCallback(
@@ -84,6 +89,7 @@ export function ChainStep({ onNext }: ChainStepProps) {
       if (!chains.sourceChain?.rpcUrls || chains.sourceChain.rpcUrls.length === 0 || !safeAccount.safeAddress) return
 
       setIsLoading(true)
+      setValidationComplete(false)
       addLog(`Fetching transaction information for hash: ${txHash}`, "info")
       try {
         const info = await getTransactionInfo(chains.sourceChain.rpcUrls, txHash)
@@ -94,7 +100,10 @@ export function ChainStep({ onNext }: ChainStepProps) {
         const deploymentData = await parseDeploymentTransaction(chains.sourceChain.rpcUrls, txHash, addLog)
 
         // Validate if the Safe was deployed in this transaction
-        if (deploymentData.safeAddress.toLowerCase() !== safeAccount.safeAddress.toLowerCase()) {
+        if (
+          deploymentData.safeAddress &&
+          deploymentData.safeAddress.toLowerCase() !== safeAccount.safeAddress.toLowerCase()
+        ) {
           throw new Error("The provided Safe address does not match the one deployed in this transaction")
         }
 
@@ -118,40 +127,6 @@ export function ChainStep({ onNext }: ChainStepProps) {
     [chains.sourceChain?.rpcUrls, safeAccount.safeAddress, addLog, setSafeAccount],
   )
 
-  // Check if all conditions are met to enable the Next button
-  useEffect(() => {
-    const canProceed =
-      !!chains.sourceChain &&
-      !!safeAccount.safeAddress &&
-      !!safeAccount.txHash &&
-      isSafeValid === true &&
-      !!txInfo &&
-      !!safeAccount.factoryAddress &&
-      !isLoading
-
-    console.log("Next button conditions:", {
-      sourceChain: !!chains.sourceChain,
-      safeAddress: !!safeAccount.safeAddress,
-      txHash: !!safeAccount.txHash,
-      isSafeValid,
-      txInfo: !!txInfo,
-      factoryAddress: !!safeAccount.factoryAddress,
-      deploymentData: !!safeAccount.deploymentData,
-      isLoading,
-    })
-
-    setIsNextEnabled(canProceed)
-  }, [
-    chains.sourceChain,
-    safeAccount.safeAddress,
-    safeAccount.txHash,
-    isSafeValid,
-    txInfo,
-    safeAccount.factoryAddress,
-    safeAccount.deploymentData,
-    isLoading,
-  ])
-
   useEffect(() => {
     if (safeAccount.safeAddress && chains.sourceChain?.rpcUrls) {
       validateSafeAddress(safeAccount.safeAddress)
@@ -163,10 +138,6 @@ export function ChainStep({ onNext }: ChainStepProps) {
       fetchTransactionInfo(safeAccount.txHash)
     }
   }, [safeAccount.txHash, chains.sourceChain?.rpcUrls, safeAccount.safeAddress, fetchTransactionInfo])
-
-  const handleNext = () => {
-    onNext()
-  }
 
   return (
     <div className="space-y-4">
@@ -218,6 +189,7 @@ export function ChainStep({ onNext }: ChainStepProps) {
           onChange={(e) => {
             setSafeAccount((prev) => ({ ...prev, txHash: e.target.value }))
             addLog(`Transaction hash set to: ${e.target.value}`)
+            setValidationComplete(false)
           }}
           placeholder="0x..."
         />
@@ -245,7 +217,7 @@ export function ChainStep({ onNext }: ChainStepProps) {
           <p>To: {txInfo.to}</p>
         </div>
       )}
-      <Button onClick={handleNext} disabled={!isNextEnabled}>
+      <Button onClick={onNext} disabled={isLoading || !validationComplete}>
         Next
       </Button>
       <LogDisplay logs={logs} />
