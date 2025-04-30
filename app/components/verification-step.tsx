@@ -139,4 +139,3 @@ export function VerificationStep({ onNext, onPrev }: VerificationStepProps) {
     </div>
   )
 }
-

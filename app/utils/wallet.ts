@@ -1,7 +1,7 @@
 import { init, useConnectWallet } from "@web3-onboard/react"
 import injectedModule from "@web3-onboard/injected-wallets"
 import { fetchChainInfo } from "./chainInfo"
-import { createPublicClient, http, createWalletClient, custom, extractChain } from "viem"
+import { createPublicClient, http, fallback, createWalletClient, custom, extractChain } from "viem"
 import * as chains from "viem/chains"
 
 const injected = injectedModule()
@@ -26,8 +26,15 @@ export async function checkWalletBalance(address: string, chainId: string) {
     throw new Error("No RPC URLs available for this chain")
   }
 
+  // Create an array of HTTP transports for each RPC URL
+  const transports = chainInfo.rpcUrls.map((url) => http(url))
+
   const client = createPublicClient({
-    transport: http(chainInfo.rpcUrls[0]), // Use the first RPC URL
+    transport: fallback(transports, {
+      rank: true,
+      retryCount: 3,
+      retryDelay: 1000,
+    }),
   })
 
   try {
@@ -97,4 +104,3 @@ export async function deploySafe(
     throw error
   }
 }
-

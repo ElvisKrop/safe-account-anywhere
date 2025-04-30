@@ -231,4 +231,3 @@ export function ChainStep({ onNext }: ChainStepProps) {
     </div>
   )
 }
-

@@ -33,4 +33,3 @@ export function LogDisplay({ logs }: LogDisplayProps) {
     </div>
   )
 }
-

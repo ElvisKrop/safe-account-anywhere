@@ -1,4 +1,4 @@
-import { createPublicClient, http, decodeAbiParameters, parseAbiParameters } from "viem"
+import { createPublicClient, http, fallback, decodeAbiParameters, parseAbiParameters } from "viem"
 
 export async function fetchChainInfo(chainId: string) {
   if (!chainId || isNaN(Number(chainId))) {
@@ -23,11 +23,18 @@ export async function fetchChainInfo(chainId: string) {
       throw new Error(`No RPC URLs found for chain ID ${chainId}`)
     }
 
-    // Filter for HTTPS RPC URLs
-    const httpsRpcUrls = chainInfo.rpc.filter((url: string) => url.startsWith("https://"))
+    // Filter out RPC URLs with template variables like ${API_KEY}
+    const filteredRpcUrls = chainInfo.rpc.filter((url: string) => !url.includes("${"))
 
-    // If no HTTPS URLs are available, use all URLs
-    const rpcUrls = httpsRpcUrls.length > 0 ? httpsRpcUrls : chainInfo.rpc
+    if (filteredRpcUrls.length === 0) {
+      throw new Error(`No usable RPC URLs found for chain ID ${chainId}. All URLs require API keys or other variables.`)
+    }
+
+    // Filter for HTTPS RPC URLs
+    const httpsRpcUrls = filteredRpcUrls.filter((url: string) => url.startsWith("https://"))
+
+    // If no HTTPS URLs are available, use all filtered URLs
+    const rpcUrls = httpsRpcUrls.length > 0 ? httpsRpcUrls : filteredRpcUrls
 
     return {
       chainId: chainInfo.chainId,
@@ -51,7 +58,7 @@ export async function verifySafeDeployment(rpcUrls: string[], safeAddress: strin
     throw new Error("RPC URLs are missing. Please ensure the chain information is correctly fetched and passed.")
   }
   try {
-    const client = createPublicClientForChain(rpcUrls[0]) // Use first RPC URL
+    const client = createPublicClientForChain(rpcUrls)
     const code = await client.getBytecode({ address: safeAddress as `0x${string}` })
     return code !== undefined && code !== "0x"
   } catch (error) {
@@ -65,7 +72,7 @@ export async function parseDeploymentTransaction(rpcUrls: string[], txHash: stri
     throw new Error("RPC URLs are missing")
   }
   try {
-    const client = createPublicClientForChain(rpcUrls[0]) // Use first RPC URL
+    const client = createPublicClientForChain(rpcUrls)
     const tx = await client.getTransaction({ hash: txHash as `0x${string}` })
     addLog("Tx received from the blockchain", "success")
 
@@ -145,10 +152,7 @@ export async function getTransactionInfo(rpcUrls: string[], txHash: string) {
     throw new Error("RPC URLs are missing")
   }
   try {
-    const client = createPublicClient({
-      transport: http(rpcUrls[0]), // Use first RPC URL
-    })
-
+    const client = createPublicClientForChain(rpcUrls)
     const tx = await client.getTransaction({ hash: txHash as `0x${string}` })
 
     return {
@@ -161,9 +165,16 @@ export async function getTransactionInfo(rpcUrls: string[], txHash: string) {
   }
 }
 
-export function createPublicClientForChain(rpcUrl: string) {
+export function createPublicClientForChain(rpcUrls: string[]) {
+  // Create an array of HTTP transports for each RPC URL
+  const transports = rpcUrls.map((url) => http(url))
+
   return createPublicClient({
-    transport: http(rpcUrl),
+    transport: fallback(transports, {
+      rank: true, // Automatically rank transports by response time
+      retryCount: 3, // Retry each transport 3 times before moving to the next
+      retryDelay: 1000, // Wait 1 second between retries
+    }),
   })
 }
 
@@ -172,7 +183,7 @@ export async function verifyContractDeployment(rpcUrls: string[], address: strin
     throw new Error("RPC URLs are missing")
   }
   try {
-    const client = createPublicClientForChain(rpcUrls[0]) // Use first RPC URL
+    const client = createPublicClientForChain(rpcUrls)
     const code = await client.getBytecode({ address: address as `0x${string}` })
     return code !== undefined && code !== "0x"
   } catch (error) {
@@ -180,4 +191,3 @@ export async function verifyContractDeployment(rpcUrls: string[], address: strin
     throw error
   }
 }
-
