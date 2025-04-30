@@ -35,6 +35,7 @@ export function ChainStep({ onNext }: ChainStepProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isSafeValid, setIsSafeValid] = useState<boolean | null>(null)
   const [txInfo, setTxInfo] = useState<any>(null)
+  const [isNextEnabled, setIsNextEnabled] = useState(false)
 
   const addLog = useCallback((message: string, type: "info" | "success" | "error" = "info") => {
     setLogs((prevLogs) => [...prevLogs, { message, type, timestamp: new Date() }])
@@ -117,6 +118,40 @@ export function ChainStep({ onNext }: ChainStepProps) {
     [chains.sourceChain?.rpcUrls, safeAccount.safeAddress, addLog, setSafeAccount],
   )
 
+  // Check if all conditions are met to enable the Next button
+  useEffect(() => {
+    const canProceed =
+      !!chains.sourceChain &&
+      !!safeAccount.safeAddress &&
+      !!safeAccount.txHash &&
+      isSafeValid === true &&
+      !!txInfo &&
+      !!safeAccount.factoryAddress &&
+      !isLoading
+
+    console.log("Next button conditions:", {
+      sourceChain: !!chains.sourceChain,
+      safeAddress: !!safeAccount.safeAddress,
+      txHash: !!safeAccount.txHash,
+      isSafeValid,
+      txInfo: !!txInfo,
+      factoryAddress: !!safeAccount.factoryAddress,
+      deploymentData: !!safeAccount.deploymentData,
+      isLoading,
+    })
+
+    setIsNextEnabled(canProceed)
+  }, [
+    chains.sourceChain,
+    safeAccount.safeAddress,
+    safeAccount.txHash,
+    isSafeValid,
+    txInfo,
+    safeAccount.factoryAddress,
+    safeAccount.deploymentData,
+    isLoading,
+  ])
+
   useEffect(() => {
     if (safeAccount.safeAddress && chains.sourceChain?.rpcUrls) {
       validateSafeAddress(safeAccount.safeAddress)
@@ -145,9 +180,6 @@ export function ChainStep({ onNext }: ChainStepProps) {
             placeholder="e.g., 1 for Ethereum Mainnet"
             disabled={isLoading}
           />
-          {/* <Button onClick={() => handleFetchChainInfo(chains.sourceChain?.chainId || "")} disabled={isLoading}>
-            {isLoading ? "Fetching..." : "Fetch Chain Info"}
-          </Button> */}
         </div>
       </div>
       {chains.sourceChain && (
@@ -213,18 +245,7 @@ export function ChainStep({ onNext }: ChainStepProps) {
           <p>To: {txInfo.to}</p>
         </div>
       )}
-      <Button
-        onClick={handleNext}
-        disabled={
-          !chains.sourceChain ||
-          !safeAccount.safeAddress ||
-          !safeAccount.txHash ||
-          !isSafeValid ||
-          !txInfo ||
-          !safeAccount.deploymentData ||
-          isLoading
-        }
-      >
+      <Button onClick={handleNext} disabled={!isNextEnabled}>
         Next
       </Button>
       <LogDisplay logs={logs} />
