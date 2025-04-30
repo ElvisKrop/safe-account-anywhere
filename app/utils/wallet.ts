@@ -74,6 +74,22 @@ export async function deploySafe(
 
     onLog("Preparing deployment transaction...", "info")
 
+    // Create a public client for reading blockchain data
+    const chainInfo = await fetchChainInfo(destinationChainId)
+    const transports = chainInfo.rpcUrls.map((url) => http(url))
+    const publicClient = createPublicClient({
+      chain: extractChain({
+        chains: Object.values(chains),
+        id: destinationChainId,
+      }),
+      transport: fallback(transports, {
+        rank: true,
+        retryCount: 3,
+        retryDelay: 1000,
+      }),
+    })
+
+    // Create wallet client for sending transactions
     const walletClient = createWalletClient({
       chain: extractChain({
         chains: Object.values(chains),
@@ -85,18 +101,35 @@ export async function deploySafe(
     const [account] = await walletClient.getAddresses()
     const hash = await walletClient.sendTransaction({
       account,
-      to: factoryAddress,
-      data: deploymentData,
-      value: "0x0",
+      to: factoryAddress as `0x${string}`,
+      data: deploymentData as `0x${string}`,
+      value: BigInt(0),
     })
 
     onLog(`Transaction sent. Hash: ${hash}`, "success")
 
     onLog("Waiting for transaction confirmation...", "info")
-    const receipt = await walletClient.waitForTransactionReceipt({ hash })
 
-    const safeAddress = receipt.logs[0].address // Assuming the first event is the ProxyCreation event
+    // Use the publicClient to wait for transaction receipt
+    const receipt = await publicClient.waitForTransactionReceipt({
+      hash,
+      timeout: 60_000, // 60 seconds timeout
+      confirmations: 1,
+    })
+
+    // Find the ProxyCreation event in the logs
+    const proxyCreationEvent = receipt.logs.find(
+      (log) => log.topics[0] === "0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9ec9070a6199ad418e235",
+    )
+
+    if (!proxyCreationEvent) {
+      throw new Error("ProxyCreation event not found in transaction logs")
+    }
+
+    // Extract the Safe address from the event
+    const safeAddress = proxyCreationEvent.address
     onLog(`Safe deployed at: ${safeAddress}`, "success")
+
     return { txHash: hash, safeAddress }
   } catch (error) {
     console.error("Error deploying Safe:", error)
