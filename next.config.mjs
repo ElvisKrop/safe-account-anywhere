@@ -17,6 +17,8 @@ const nextConfig = {
     })
     return config
   },
+  // Ensure the public directory is properly handled
+  assetPrefix: process.env.NODE_ENV === 'production' ? '/' : '',
 }
 
 export default nextConfig

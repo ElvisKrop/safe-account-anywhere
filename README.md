@@ -2,7 +2,7 @@
 
 A web application that enables deploying Safe smart contract accounts across multiple EVM-compatible networks while preserving the same address.
 
-![Safe Anywhere](https://placeholder.com/your-screenshot-here)
+![Safe Anywhere](/images/safe-anywhere-banner.png)
 
 ## Overview
 
