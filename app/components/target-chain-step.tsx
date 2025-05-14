@@ -10,6 +10,7 @@ import { LogDisplay } from "./log-display"
 import { useSafeAccount } from "../context/safe-account-context"
 import { useChains } from "../context/chains-context"
 import { Loader2 } from "lucide-react"
+import { createPublicClient, http } from "viem"
 
 const debounce = (func: (...args: any[]) => void, delay: number) => {
   let timeoutId: NodeJS.Timeout
@@ -33,6 +34,10 @@ export function TargetChainStep({ onNext, onPrev }: TargetChainStepProps) {
   const [isSafeAlreadyDeployed, setIsSafeAlreadyDeployed] = useState(false)
   const [logs, setLogs] = useState<Array<{ message: string; type: "info" | "success" | "error"; timestamp: Date }>>([])
   const [targetChainIdInput, setTargetChainIdInput] = useState("")
+  const [customRpcUrl, setCustomRpcUrl] = useState("")
+  const [customRpcError, setCustomRpcError] = useState<string | null>(null)
+  const [isLoadingCustom, setIsLoadingCustom] = useState(false)
+  const [chainDataFetchFailed, setChainDataFetchFailed] = useState(false)
 
   useEffect(() => {
     setChains((prev) => ({ ...prev, targetChain: null }))
@@ -57,6 +62,13 @@ export function TargetChainStep({ onNext, onPrev }: TargetChainStepProps) {
 
         addLog("Fetching target chain information...", "info")
         const chainInfo = await fetchChainInfo(chainId)
+
+        // Reset the chain data fetch failed flag and clear custom RPC URL
+        // when we successfully fetch chain data
+        setChainDataFetchFailed(false)
+        setCustomRpcUrl("")
+        setCustomRpcError(null)
+
         setChains((prev) => ({ ...prev, targetChain: chainInfo }))
         addLog("Target chain information fetched successfully", "success")
 
@@ -103,6 +115,7 @@ export function TargetChainStep({ onNext, onPrev }: TargetChainStepProps) {
             : "Failed to fetch target chain information or verify contracts. Please check the Chain ID and try again.",
         )
         addLog("Error: Failed to fetch target chain information or verify contracts", "error")
+        setChainDataFetchFailed(true)
       } finally {
         setIsLoading(false)
       }
@@ -110,16 +123,129 @@ export function TargetChainStep({ onNext, onPrev }: TargetChainStepProps) {
     [addLog, safeAccount.factoryAddress, safeAccount.safeAddress, setChains],
   )
 
-  const ExplorerLink = ({ type, value }: { type: "address" | "tx"; value: string }) => (
-    <Link
-      href={`${chains.targetChain?.explorerUrl}/${type}/${value}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-blue-500 hover:underline break-all"
-    >
-      {value}
-    </Link>
-  )
+  // Add this useEffect after the other useEffect in the component
+  useEffect(() => {
+    // If the user is typing a new chain ID, reset the custom RPC state
+    if (targetChainIdInput) {
+      setCustomRpcUrl("")
+      setCustomRpcError(null)
+    }
+  }, [targetChainIdInput])
+
+  const handleCustomRpcFetch = async () => {
+    if (!customRpcUrl || !customRpcUrl.startsWith("https://")) {
+      setCustomRpcError("Please enter a valid HTTPS RPC URL")
+      return
+    }
+
+    try {
+      setIsLoadingCustom(true)
+      setCustomRpcError(null)
+      setError(null)
+      setIsFactoryDeployed(false)
+      setIsSafeAlreadyDeployed(false)
+
+      addLog("Connecting to custom RPC endpoint...", "info")
+
+      // Create a temporary client to get chain information
+      const transport = http(customRpcUrl)
+      const tempClient = createPublicClient({ transport })
+
+      // Get chain ID from the RPC endpoint
+      const chainIdHex = await tempClient.request({ method: "eth_chainId" })
+      const chainIdDecimal = Number.parseInt(chainIdHex, 16).toString()
+
+      addLog(`Connected to chain with ID: ${chainIdDecimal}`, "success")
+
+      // Try to get chain name
+      let chainName = "Custom Chain"
+      try {
+        const networkResponse = await tempClient.request({ method: "net_version" })
+        if (networkResponse) {
+          chainName = `Custom Chain (${networkResponse})`
+        }
+      } catch (err) {
+        console.log("Could not get network name, using default")
+      }
+
+      // Create custom chain info
+      const customChainInfo = {
+        chainId: chainIdDecimal,
+        name: chainName,
+        rpcUrls: [customRpcUrl],
+        explorerUrl: "",
+        nativeCurrency: {
+          name: "Native Token",
+          symbol: "ETH",
+          decimals: 18,
+        },
+      }
+
+      setChains((prev) => ({ ...prev, targetChain: customChainInfo }))
+      addLog("Custom chain information set successfully", "success")
+
+      if (safeAccount.factoryAddress) {
+        addLog("Verifying factory deployment on custom chain...", "info")
+        const factoryDeployed = await verifyContractDeployment([customRpcUrl], safeAccount.factoryAddress)
+        setIsFactoryDeployed(factoryDeployed)
+        addLog(
+          factoryDeployed ? "Factory is deployed on custom chain" : "Factory is not deployed on custom chain",
+          factoryDeployed ? "success" : "error",
+        )
+
+        if (!factoryDeployed) {
+          setError(
+            "The Safe factory is not deployed on the custom chain. Please choose a different chain or deploy the factory first.",
+          )
+          return
+        }
+      }
+
+      addLog("Checking if Safe is already deployed on custom chain...", "info")
+      const safeDeployed = await verifyContractDeployment([customRpcUrl], safeAccount.safeAddress)
+      setIsSafeAlreadyDeployed(safeDeployed)
+      addLog(
+        safeDeployed ? "Safe is already deployed on custom chain" : "Safe is not yet deployed on custom chain",
+        safeDeployed ? "error" : "success",
+      )
+
+      if (safeDeployed) {
+        setError(
+          "A Safe with this address is already deployed on the custom chain. Please choose a different chain or use a different Safe.",
+        )
+      }
+
+      setCustomRpcUrl("")
+    } catch (err) {
+      console.error("Error connecting to custom RPC:", err)
+      setCustomRpcError(
+        err instanceof Error
+          ? err.message
+          : "Failed to connect to custom RPC endpoint. Please check the URL and try again.",
+      )
+      addLog("Error: Failed to connect to custom RPC endpoint", "error")
+    } finally {
+      setIsLoadingCustom(false)
+    }
+  }
+
+  const ExplorerLink = ({ type, value }: { type: "address" | "tx"; value: string }) => {
+    // If we don't have an explorer URL or it's empty, just show the address without a link
+    if (!chains.targetChain?.explorerUrl) {
+      return <span className="font-mono text-blue-500">{value}</span>
+    }
+
+    return (
+      <Link
+        href={`${chains.targetChain.explorerUrl}/${type}/${value}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-500 hover:underline break-all font-mono"
+      >
+        {value}
+      </Link>
+    )
+  }
 
   return (
     <div className="space-y-4">
@@ -142,6 +268,30 @@ export function TargetChainStep({ onNext, onPrev }: TargetChainStepProps) {
           {isLoading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
         </div>
       </div>
+      {(chainDataFetchFailed ||
+        (chains.targetChain && (!chains.targetChain.rpcUrls || chains.targetChain.rpcUrls.length === 0))) && (
+        <div className="space-y-2">
+          <div className="flex items-center">
+            <Label htmlFor="customRpcUrl">Custom RPC URL</Label>
+            <span className="ml-2 text-xs text-muted-foreground">(Network data unavailable or missing RPC URLs)</span>
+          </div>
+          <div className="flex gap-2">
+            <Input
+              id="customRpcUrl"
+              value={customRpcUrl}
+              onChange={(e) => setCustomRpcUrl(e.target.value)}
+              placeholder="https://..."
+            />
+            <Button
+              onClick={handleCustomRpcFetch}
+              disabled={isLoading || !customRpcUrl || !customRpcUrl.startsWith("https://")}
+            >
+              {isLoadingCustom ? "Connecting..." : "Connect"}
+            </Button>
+          </div>
+          {customRpcError && <p className="text-red-500 text-sm">{customRpcError}</p>}
+        </div>
+      )}
       {isLoading && <p>Loading target chain information...</p>}
       {error && <p className="text-red-500">{error}</p>}
       {chains.targetChain && (
