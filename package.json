@@ -1,7 +1,19 @@
 {
-  "name": "my-v0-project",
-  "version": "0.1.0",
+  "name": "safe-anywhere",
+  "version": "1.0.0",
+  "description": "Deploy your Safe across chains - with same address",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ElvisKrop/safe-account-anywhere.git"
+  },
+  "homepage": "https://github.com/ElvisKrop/safe-account-anywhere",
+  "bugs": {
+    "url": "https://github.com/ElvisKrop/safe-account-anywhere/issues"
+  },
+  "keywords": ["safe", "blockchain", "ethereum", "wallet", "cross-chain", "deployment"],
+  "author": "ElvisKrop",
+  "license": "MIT",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
