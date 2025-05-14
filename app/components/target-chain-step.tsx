@@ -9,6 +9,15 @@ import Link from "next/link"
 import { LogDisplay } from "./log-display"
 import { useSafeAccount } from "../context/safe-account-context"
 import { useChains } from "../context/chains-context"
+import { Loader2 } from "lucide-react"
+
+const debounce = (func: (...args: any[]) => void, delay: number) => {
+  let timeoutId: NodeJS.Timeout
+  return (...args: any[]) => {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => func(...args), delay)
+  }
+}
 
 interface TargetChainStepProps {
   onNext: () => void
@@ -33,71 +42,73 @@ export function TargetChainStep({ onNext, onPrev }: TargetChainStepProps) {
     setLogs((prevLogs) => [...prevLogs, { message, type, timestamp: new Date() }])
   }, [])
 
-  const fetchTargetChainInfo = async (chainId: string) => {
-    if (!chainId) {
-      setError("Please enter a target chain ID")
-      return
-    }
-
-    try {
-      setIsLoading(true)
-      setError(null)
-      setIsFactoryDeployed(false)
-      setIsSafeAlreadyDeployed(false)
-
-      addLog("Fetching target chain information...", "info")
-      const chainInfo = await fetchChainInfo(chainId)
-      setChains((prev) => ({ ...prev, targetChain: chainInfo }))
-      addLog("Target chain information fetched successfully", "success")
-
-      if (safeAccount.factoryAddress) {
-        addLog("Verifying factory deployment on target chain...", "info")
-        const factoryDeployed = await verifyContractDeployment(chainInfo.rpcUrls, safeAccount.factoryAddress)
-        setIsFactoryDeployed(factoryDeployed)
-        addLog(
-          factoryDeployed ? "Factory is deployed on target chain" : "Factory is not deployed on target chain",
-          factoryDeployed ? "success" : "error",
-        )
-
-        if (!factoryDeployed) {
-          setError(
-            "The Safe factory is not deployed on the target chain. Please choose a different chain or deploy the factory first.",
-          )
-          return
-        }
-      } else {
-        addLog("Factory address is not available", "error")
-        setIsFactoryDeployed(false)
-        setError("Factory address is not available. Please complete the verification step first.")
+  const handleFetchTargetChainInfo = useCallback(
+    debounce(async (chainId: string) => {
+      if (!chainId) {
+        setError("Please enter a target chain ID")
         return
       }
 
-      addLog("Checking if Safe is already deployed on target chain...", "info")
-      const safeDeployed = await verifyContractDeployment(chainInfo.rpcUrls, safeAccount.safeAddress)
-      setIsSafeAlreadyDeployed(safeDeployed)
-      addLog(
-        safeDeployed ? "Safe is already deployed on target chain" : "Safe is not yet deployed on target chain",
-        safeDeployed ? "error" : "success",
-      )
+      try {
+        setIsLoading(true)
+        setError(null)
+        setIsFactoryDeployed(false)
+        setIsSafeAlreadyDeployed(false)
 
-      if (safeDeployed) {
-        setError(
-          "A Safe with this address is already deployed on the target chain. Please choose a different chain or use a different Safe.",
+        addLog("Fetching target chain information...", "info")
+        const chainInfo = await fetchChainInfo(chainId)
+        setChains((prev) => ({ ...prev, targetChain: chainInfo }))
+        addLog("Target chain information fetched successfully", "success")
+
+        if (safeAccount.factoryAddress) {
+          addLog("Verifying factory deployment on target chain...", "info")
+          const factoryDeployed = await verifyContractDeployment(chainInfo.rpcUrls, safeAccount.factoryAddress)
+          setIsFactoryDeployed(factoryDeployed)
+          addLog(
+            factoryDeployed ? "Factory is deployed on target chain" : "Factory is not deployed on target chain",
+            factoryDeployed ? "success" : "error",
+          )
+
+          if (!factoryDeployed) {
+            setError(
+              "The Safe factory is not deployed on the target chain. Please choose a different chain or deploy the factory first.",
+            )
+            return
+          }
+        } else {
+          addLog("Factory address is not available", "error")
+          setIsFactoryDeployed(false)
+          setError("Factory address is not available. Please complete the verification step first.")
+          return
+        }
+
+        addLog("Checking if Safe is already deployed on target chain...", "info")
+        const safeDeployed = await verifyContractDeployment(chainInfo.rpcUrls, safeAccount.safeAddress)
+        setIsSafeAlreadyDeployed(safeDeployed)
+        addLog(
+          safeDeployed ? "Safe is already deployed on target chain" : "Safe is not yet deployed on target chain",
+          safeDeployed ? "error" : "success",
         )
+
+        if (safeDeployed) {
+          setError(
+            "A Safe with this address is already deployed on the target chain. Please choose a different chain or use a different Safe.",
+          )
+        }
+      } catch (err) {
+        console.error("Error in fetchTargetChainInfo:", err)
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to fetch target chain information or verify contracts. Please check the Chain ID and try again.",
+        )
+        addLog("Error: Failed to fetch target chain information or verify contracts", "error")
+      } finally {
+        setIsLoading(false)
       }
-      setTargetChainIdInput("") // Clear the input after successful fetch
-    } catch (err) {
-      console.error("Error in fetchTargetChainInfo:", err)
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to fetch target chain information or verify contracts. Please check the Chain ID and try again.",
-      )
-      addLog("Error: Failed to fetch target chain information or verify contracts", "error")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+    }, 800),
+    [addLog, safeAccount.factoryAddress, safeAccount.safeAddress, setChains],
+  )
 
   const ExplorerLink = ({ type, value }: { type: "address" | "tx"; value: string }) => (
     <Link
@@ -118,12 +129,17 @@ export function TargetChainStep({ onNext, onPrev }: TargetChainStepProps) {
           <Input
             id="targetChainId"
             value={targetChainIdInput}
-            onChange={(e) => setTargetChainIdInput(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value
+              setTargetChainIdInput(value)
+              // Only allow numeric input
+              if (value === "" || /^\d+$/.test(value)) {
+                handleFetchTargetChainInfo(value)
+              }
+            }}
             placeholder="e.g., 137 for Polygon"
           />
-          <Button onClick={() => fetchTargetChainInfo(targetChainIdInput)} disabled={isLoading}>
-            {isLoading ? "Fetching..." : "Fetch Information"}
-          </Button>
+          {isLoading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
         </div>
       </div>
       {isLoading && <p>Loading target chain information...</p>}

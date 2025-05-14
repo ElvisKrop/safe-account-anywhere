@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { ChainStep } from "./components/chain-step"
 import { VerificationStep } from "./components/verification-step"
 import { TargetChainStep } from "./components/target-chain-step"
@@ -12,6 +12,7 @@ import { SafeAccountProvider } from "./context/safe-account-context"
 import { ChainsProvider } from "./context/chains-context"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { VersionDisplay } from "./components/version-display"
 
 export default function SafeDeployment() {
   const [step, setStep] = useState(1)
@@ -41,8 +42,10 @@ export default function SafeDeployment() {
           </div>
           <Card className="w-full max-w-2xl mx-auto">
             <CardHeader>
-              <CardTitle>Deploy Safe on Different Chain</CardTitle>
-              <CardDescription>Follow the steps to deploy your existing Safe account on a new chain.</CardDescription>
+              <CardTitle>Safe Anywhere</CardTitle>
+              <CardDescription>
+                Follow the steps to deploy your existing Safe account on any EVM-compatible chain.
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {step === 1 && <ChainStep onNext={handleNextStep} />}
@@ -54,6 +57,9 @@ export default function SafeDeployment() {
               {step === 3 && <TargetChainStep onNext={handleNextStep} onPrev={handlePrevStep} />}
               {step === 4 && <DeploymentStep onPrev={handlePrevStep} />}
             </CardContent>
+            <CardFooter className="flex justify-end text-xs text-muted-foreground">
+              <VersionDisplay />
+            </CardFooter>
           </Card>
         </div>
       </ChainsProvider>

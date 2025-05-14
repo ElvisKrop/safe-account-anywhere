@@ -13,7 +13,7 @@ import {
   getTransactionInfo,
   parseDeploymentTransaction,
 } from "../utils/blockchain"
-import { CheckCircle, XCircle } from "lucide-react"
+import { CheckCircle, XCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
 
 interface ChainStepProps {
@@ -36,6 +36,7 @@ export function ChainStep({ onNext }: ChainStepProps) {
   const [isSafeValid, setIsSafeValid] = useState<boolean | null>(null)
   const [txInfo, setTxInfo] = useState<any>(null)
   const [validationComplete, setValidationComplete] = useState(false)
+  const [chainIdInput, setChainIdInput] = useState(chains.sourceChain?.chainId || "")
 
   const addLog = useCallback((message: string, type: "info" | "success" | "error" = "info") => {
     setLogs((prevLogs) => [...prevLogs, { message, type, timestamp: new Date() }])
@@ -48,6 +49,10 @@ export function ChainStep({ onNext }: ChainStepProps) {
 
   const handleFetchChainInfo = useCallback(
     debounce(async (chainId: string) => {
+      if (!chainId || chainId === "") {
+        return
+      }
+
       setIsLoading(true)
       addLog(`Fetching chain information for Chain ID: ${chainId}`, "info")
       try {
@@ -60,8 +65,8 @@ export function ChainStep({ onNext }: ChainStepProps) {
       } finally {
         setIsLoading(false)
       }
-    }, 500),
-    [addLog],
+    }, 800), // Increased debounce time to 800ms for better user experience
+    [addLog, setChains],
   )
 
   const validateSafeAddress = useCallback(
@@ -146,11 +151,19 @@ export function ChainStep({ onNext }: ChainStepProps) {
         <div className="flex gap-2">
           <Input
             id="sourceChainId"
-            value={chains.sourceChain?.chainId || ""}
-            onChange={(e) => handleFetchChainInfo(e.target.value)}
+            value={chainIdInput}
+            onChange={(e) => {
+              const value = e.target.value
+              setChainIdInput(value)
+              // Only allow numeric input
+              if (value === "" || /^\d+$/.test(value)) {
+                handleFetchChainInfo(value)
+              }
+            }}
             placeholder="e.g., 1 for Ethereum Mainnet"
             disabled={isLoading}
           />
+          {isLoading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
         </div>
       </div>
       {chains.sourceChain && (
