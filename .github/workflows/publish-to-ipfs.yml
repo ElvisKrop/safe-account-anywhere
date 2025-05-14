@@ -40,17 +40,8 @@ jobs:
       - name: Build Next.js app
         run: pnpm build
 
-      - name: Install IPFS CLI
-        run: npm install -g ipfs-cli
-
-      - name: Upload to IPFS
-        id: upload
-        run: |
-          HASH=$(ipfs add -r out | tail -n 1 | cut -d ' ' -f 2)
-          echo "IPFS_HASH=$HASH" >> $GITHUB_ENV
-          echo "ipfs_hash=$HASH" >> $GITHUB_OUTPUT
-
       - name: Pin to Pinata
+        id: pinata
         uses: anantaramdas/ipfs-pinata-deploy-action@v1.6.4
         with:
           pin-name: 'Safe Account Anywhere ${{ github.ref_name }}'
@@ -65,11 +56,11 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: |
-            IPFS Hash: ${{ steps.upload.outputs.ipfs_hash }}
+            IPFS Hash: ${{ steps.pinata.outputs.hash }}
             
             Gateway URLs:
-            - https://ipfs.io/ipfs/${{ steps.upload.outputs.ipfs_hash }}
-            - https://gateway.pinata.cloud/ipfs/${{ steps.upload.outputs.ipfs_hash }}
-            - https://cloudflare-ipfs.com/ipfs/${{ steps.upload.outputs.ipfs_hash }}
+            - https://ipfs.io/ipfs/${{ steps.pinata.outputs.hash }}
+            - https://gateway.pinata.cloud/ipfs/${{ steps.pinata.outputs.hash }}
+            - https://cloudflare-ipfs.com/ipfs/${{ steps.pinata.outputs.hash }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
