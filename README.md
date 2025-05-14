@@ -27,20 +27,20 @@ Safe Anywhere simplifies the process of deploying existing Safe accounts to new 
 ### Setup
 
 1. Clone the repository:
-   \`\`\`bash
+   ```bash
    git clone https://github.com/ElvisKrop/safe-account-anywhere.git
    cd safe-account-anywhere
-   \`\`\`
+   ```
 
 2. Install dependencies:
-   \`\`\`bash
+   ```bash
    pnpm install
-   \`\`\`
+   ```
 
 3. Run the development server:
-   \`\`\`bash
+   ```bash
    pnpm dev
-   \`\`\`
+   ```
 
 4. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
 

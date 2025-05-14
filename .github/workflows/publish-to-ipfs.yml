@@ -1,0 +1,75 @@
+name: Publish to IPFS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Next.js app
+        run: pnpm build
+
+      - name: Install IPFS CLI
+        run: npm install -g ipfs-cli
+
+      - name: Upload to IPFS
+        id: upload
+        run: |
+          HASH=$(ipfs add -r out | tail -n 1 | cut -d ' ' -f 2)
+          echo "IPFS_HASH=$HASH" >> $GITHUB_ENV
+          echo "ipfs_hash=$HASH" >> $GITHUB_OUTPUT
+
+      - name: Pin to Pinata
+        uses: anantaramdas/ipfs-pinata-deploy-action@v1.6.4
+        with:
+          pin-name: 'Safe Account Anywhere ${{ github.ref_name }}'
+          path: './out'
+          pinata-api-key: ${{ secrets.PINATA_API_KEY }}
+          pinata-secret-api-key: ${{ secrets.PINATA_SECRET_API_KEY }}
+          verbose: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            IPFS Hash: ${{ steps.upload.outputs.ipfs_hash }}
+            
+            Gateway URLs:
+            - https://ipfs.io/ipfs/${{ steps.upload.outputs.ipfs_hash }}
+            - https://gateway.pinata.cloud/ipfs/${{ steps.upload.outputs.ipfs_hash }}
+            - https://cloudflare-ipfs.com/ipfs/${{ steps.upload.outputs.ipfs_hash }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
