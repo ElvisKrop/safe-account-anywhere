@@ -1,10 +1,15 @@
-name: Publish to IPFS
+name: Deploy to IPFS
+
+permissions:
+  contents: write  # Changed to write to allow creating releases
+  pull-requests: write
+  statuses: write
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -12,7 +17,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -40,14 +45,12 @@ jobs:
       - name: Build Next.js app
         run: pnpm build
 
-      - name: Pin to Pinata
-        id: pinata
-        uses: anantaramdas/ipfs-pinata-deploy-action@v1.6.4
+      - name: Deploy to IPFS
+        uses: aquiladev/ipfs-action@master
+        id: ipfs
         with:
-          pin-name: 'Safe Account Anywhere ${{ github.ref_name }}'
-          path: './out'
-          pinata-api-key: ${{ secrets.PINATA_API_KEY }}
-          pinata-secret-api-key: ${{ secrets.PINATA_SECRET_API_KEY }}
+          path: ./out
+          service: ipfs
           verbose: true
 
       - name: Create GitHub Release
@@ -56,11 +59,11 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
           body: |
-            IPFS Hash: ${{ steps.pinata.outputs.hash }}
+            IPFS Hash: ${{ steps.ipfs.outputs.hash }}
             
             Gateway URLs:
-            - https://ipfs.io/ipfs/${{ steps.pinata.outputs.hash }}
-            - https://gateway.pinata.cloud/ipfs/${{ steps.pinata.outputs.hash }}
-            - https://cloudflare-ipfs.com/ipfs/${{ steps.pinata.outputs.hash }}
+            - https://ipfs.io/ipfs/${{ steps.ipfs.outputs.hash }}
+            - https://cloudflare-ipfs.com/ipfs/${{ steps.ipfs.outputs.hash }}
+            - https://gateway.ipfs.io/ipfs/${{ steps.ipfs.outputs.hash }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
