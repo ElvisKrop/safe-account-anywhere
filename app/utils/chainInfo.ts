@@ -1,3 +1,13 @@
+const CUSTOM_CHAINS = [
+  {
+    chainId: 239,
+    name: "TAC Mainnet",
+    explorers: [{ url: "https://tac.blockscout.com" }],
+    rpc: [{ url: "https://rpc.ankr.com/tac" }],
+    nativeCurrency: { name: "TAC", symbol: "TAC", decimals: 18 },
+  }
+]
+
 export async function fetchChainInfo(chainId: string) {
   if (!chainId || isNaN(Number(chainId))) {
     throw new Error(`Invalid chainId: ${chainId}`)
@@ -12,7 +22,7 @@ export async function fetchChainInfo(chainId: string) {
       throw new Error(`Failed to fetch chain info for chain ID ${chainId}. Status: ${response.status}`)
     }
     const chainsInfo = await response.json()
-    const chainInfo = chainsInfo.find((chain: { chainId: number }) => String(chain.chainId) === String(chainId))
+    const chainInfo = [...CUSTOM_CHAINS, ...chainsInfo].find((chain: { chainId: number }) => String(chain.chainId) === String(chainId))
 
     const explorerUrl =
       chainInfo.explorers && chainInfo.explorers[0] && chainInfo.explorers[0].url
