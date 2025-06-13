@@ -7,14 +7,10 @@ import { Label } from "@/components/ui/label"
 import { LogDisplay } from "./log-display"
 import { useSafeAccount } from "../context/safe-account-context"
 import { useChains } from "../context/chains-context"
-import {
-  fetchChainInfo,
-  verifySafeDeployment,
-  getTransactionInfo,
-  parseDeploymentTransaction,
-} from "../utils/blockchain"
+import { verifySafeDeployment, getTransactionInfo, parseDeploymentTransaction } from "../utils/blockchain"
 import { CheckCircle, XCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { fetchChainInfo } from "../utils/chainInfo"
 
 interface ChainStepProps {
   onNext: () => void

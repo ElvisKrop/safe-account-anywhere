@@ -9,7 +9,6 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Safe Anywhere",
   description: "Deploy your Safe on any EVM-compatible chain",
-    generator: 'v0.dev'
 }
 
 export default function RootLayout({

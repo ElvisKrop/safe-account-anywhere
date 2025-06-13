@@ -4,13 +4,14 @@ import { useState, useCallback, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { fetchChainInfo, verifyContractDeployment } from "../utils/blockchain"
+import { verifyContractDeployment } from "../utils/blockchain"
 import Link from "next/link"
 import { LogDisplay } from "./log-display"
 import { useSafeAccount } from "../context/safe-account-context"
 import { useChains } from "../context/chains-context"
 import { Loader2 } from "lucide-react"
 import { createPublicClient, http } from "viem"
+import { fetchChainInfo } from "../utils/chainInfo"
 
 const debounce = (func: (...args: any[]) => void, delay: number) => {
   let timeoutId: NodeJS.Timeout
