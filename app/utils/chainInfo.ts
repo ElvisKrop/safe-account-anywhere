@@ -24,14 +24,14 @@ export async function fetchChainInfo(chainId: string) {
     }
 
     // Filter out RPC URLs with template variables like ${API_KEY}
-    const filteredRpcUrls: string[] = chainInfo.rpc.filter((url: string) => !url.includes("${"))
+    const filteredRpcUrls = chainInfo.rpc.filter(({ url }: { url: string }) => !url.includes("${"))
 
     if (filteredRpcUrls.length === 0) {
       throw new Error(`No usable RPC URLs found for chain ID ${chainId}. All URLs require API keys or other variables.`)
     }
 
     // Filter for HTTPS RPC URLs
-    const httpsRpcUrls = filteredRpcUrls.filter((url: string) => url.startsWith("https://"))
+    const httpsRpcUrls = filteredRpcUrls.filter(({ url }: { url: string }) => url.startsWith("https://"))
 
     // If no HTTPS URLs are available, use all filtered URLs
     const rpcUrls = httpsRpcUrls.length > 0 ? httpsRpcUrls : filteredRpcUrls
@@ -39,7 +39,7 @@ export async function fetchChainInfo(chainId: string) {
     return {
       chainId: chainInfo.chainId,
       name: chainInfo.name,
-      rpcUrls: rpcUrls,
+      rpcUrls: rpcUrls.map(({ url }: { url: string }) => url),
       explorerUrl,
       nativeCurrency: {
         name: chainInfo.nativeCurrency.name,
