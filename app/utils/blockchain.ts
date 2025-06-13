@@ -119,7 +119,6 @@ export function createPublicClientForChain(rpcUrls: string[]) {
 
   return createPublicClient({
     transport: fallback(transports, {
-      rank: true, // Automatically rank transports by response time
       retryCount: 3, // Retry each transport 3 times before moving to the next
       retryDelay: 1000, // Wait 1 second between retries
     }),
