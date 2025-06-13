@@ -1,4 +1,4 @@
-import { createPublicClient, http, fallback, decodeAbiParameters, parseAbiParameters } from "viem"
+import { createPublicClient, http, fallback, decodeAbiParameters, parseAbiParameters, zeroAddress } from "viem"
 
 export async function verifySafeDeployment(rpcUrls: string[], safeAddress: string) {
   if (!rpcUrls || rpcUrls.length === 0) {
@@ -41,11 +41,11 @@ export async function parseDeploymentTransaction(rpcUrls: string[], txHash: stri
     addLog("Tx has a ProxyCreation event", "success")
 
     let safeAddress: string
-    let singleton: string
+    let singleton: `0x${string}` = zeroAddress
 
     if (proxyCreationEvent.topics.length > 1) {
       // Safe 1.4.1
-      safeAddress = `0x${proxyCreationEvent.topics[1].slice(26)}`
+      safeAddress = `0x${proxyCreationEvent?.topics[1]?.slice(26)}`
       addLog("Detected Safe v1.4.1 deployment", "success")
     } else {
       // Safe 1.3.0
@@ -58,11 +58,11 @@ export async function parseDeploymentTransaction(rpcUrls: string[], txHash: stri
 
     addLog("Safe Proxy address decoded from event", "success")
 
-    const inputData = `0x${tx.input.slice(10)}`
+    const inputData: `0x${string}` = `0x${tx.input.slice(10)}`
     const paramTypes = parseAbiParameters(["address _singleton", "bytes initializer", "uint256 saltNonce"])
     const [, initializer, saltNonce] = decodeAbiParameters(paramTypes, inputData)
 
-    const initializerData = initializer as `0x${string}`
+    const initializerData = initializer
     const setupParamTypes = parseAbiParameters([
       "address[]",
       "uint256",
@@ -73,9 +73,10 @@ export async function parseDeploymentTransaction(rpcUrls: string[], txHash: stri
       "uint256",
       "address",
     ])
-    const [owners, threshold, to, data, fallbackHandler, paymentToken, payment, paymentReceiver] = decodeAbiParameters(
+    // const [owners, threshold, to, data, fallbackHandler, paymentToken, payment, paymentReceiver] = decodeAbiParameters(
+    const [owners, threshold, , , fallbackHandler] = decodeAbiParameters(
       setupParamTypes,
-      initializerData.slice(8),
+      initializerData.slice(8) as `0x${string}`,
     )
 
     return {
