@@ -7,12 +7,14 @@ export async function fetchChainInfo(chainId: string) {
 
   try {
     const response = await fetch(
-      `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-${chainId}.json`,
+      'https://chainlist.org/rpcs.json',
+      // `https://raw.githubusercontent.com/ethereum-lists/chains/master/_data/chains/eip155-${chainId}.json`,
     )
     if (!response.ok) {
       throw new Error(`Failed to fetch chain info for chain ID ${chainId}. Status: ${response.status}`)
     }
-    const chainInfo = await response.json()
+    const chainsInfo = await response.json()
+    const chainInfo = chainsInfo.chains.find((chain: { chainId: number }) => String(chain.chainId) === String(chainId))
 
     const explorerUrl =
       chainInfo.explorers && chainInfo.explorers[0] && chainInfo.explorers[0].url
