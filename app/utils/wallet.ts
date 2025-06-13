@@ -1,8 +1,9 @@
 import { init, useConnectWallet } from "@web3-onboard/react"
 import injectedModule from "@web3-onboard/injected-wallets"
-import { fetchChainInfo } from "./chainInfo"
-import { createPublicClient, http, fallback, createWalletClient, custom, extractChain } from "viem"
+import { CUSTOM_CHAINS, fetchChainInfo } from "./chainInfo"
+import { createPublicClient, http, fallback, createWalletClient, custom, extractChain, EIP1193Provider } from "viem"
 import * as chains from "viem/chains"
+import { defineChain } from "viem/utils";
 
 const injected = injectedModule()
 
@@ -13,7 +14,13 @@ init({
       id: "0x1",
       token: "ETH",
       label: "Ethereum Mainnet",
-      rpcUrl: "https://mainnet.infura.io/v3/YOUR_INFURA_KEY",
+      rpcUrl: "https://eth.llamarpc.com",
+    },
+    {
+      id: "0xEF",
+      token: "TAC",
+      label: "TAC Mainnet",
+      rpcUrl: "https://rpc.ankr.com/tac",
     },
   ],
 })
@@ -31,7 +38,6 @@ export async function checkWalletBalance(address: string, chainId: string) {
 
   const client = createPublicClient({
     transport: fallback(transports, {
-      rank: true,
       retryCount: 3,
       retryDelay: 1000,
     }),
@@ -77,13 +83,30 @@ export async function deploySafe(
     // Create a public client for reading blockchain data
     const chainInfo = await fetchChainInfo(destinationChainId)
     const transports = chainInfo.rpcUrls.map((url) => http(url))
+    const chain = defineChain({
+      id: chainInfo.chainId,
+      name: chainInfo.name,
+      nativeCurrency: chainInfo.nativeCurrency,
+      rpcUrls: {
+        default: {
+          http: [chainInfo.rpcUrls[0]],
+        },
+      },
+      blockExplorers: {
+        default: {
+          name: 'Explorer',
+          url: chainInfo.explorerUrl,
+        },
+      },
+      testnet: false,
+    })
     const publicClient = createPublicClient({
-      chain: extractChain({
-        chains: Object.values(chains),
-        id: destinationChainId,
-      }),
+      chain,
+      // chain: extractChain({
+      //   chains: Object.values(chains),
+      //   id: destinationChainId,
+      // }),
       transport: fallback(transports, {
-        rank: true,
         retryCount: 3,
         retryDelay: 1000,
       }),
@@ -91,10 +114,11 @@ export async function deploySafe(
 
     // Create wallet client for sending transactions
     const walletClient = createWalletClient({
-      chain: extractChain({
-        chains: Object.values(chains),
-        id: destinationChainId,
-      }),
+      chain,
+      // chain: extractChain({
+      //   chains: Object.values(chains),
+      //   id: destinationChainId,
+      // }),
       transport: custom(provider),
     })
 
@@ -104,6 +128,7 @@ export async function deploySafe(
       to: factoryAddress as `0x${string}`,
       data: deploymentData as `0x${string}`,
       value: BigInt(0),
+      chain,
     })
 
     onLog(`Transaction sent. Hash: ${hash}`, "success")

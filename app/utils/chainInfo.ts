@@ -1,4 +1,4 @@
-const CUSTOM_CHAINS = [
+export const CUSTOM_CHAINS = [
   {
     chainId: 239,
     name: "TAC Mainnet",
