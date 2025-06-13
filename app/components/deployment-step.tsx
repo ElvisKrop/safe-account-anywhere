@@ -17,7 +17,7 @@ interface DeploymentStepProps {
 }
 
 export function DeploymentStep({ onPrev }: DeploymentStepProps) {
-  const setChain = useSetChain()
+  const [, setChain] = useSetChain()
   const { safeAccount, setSafeAccount } = useSafeAccount()
   const { chains } = useChains()
   const [{ wallet, connecting }, connect] = useWallet()
